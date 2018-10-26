@@ -2,18 +2,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 
 
 public class ClientMain extends Application {
@@ -89,9 +88,81 @@ public class ClientMain extends Application {
         thread.start();
     }
 
-    //실제로 프로그램을 동작시키는 메소드
-    @Override
-    public void start(Stage primaryStage) {
+    public boolean validate(String name, String password) {
+        if(name.equals("") || password.equals("")) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    public boolean signup(String userId, String name, String password, String address, String postNo) {
+        // DB connection
+        Connection connection = ConnectionUtil.connect();
+        return ConnectionUtil.insertUser(connection, userId, name, password, address, postNo);
+    }
+
+    public User signin(String name, String password) {
+        // DB connection
+        Connection connection = ConnectionUtil.connect();
+        User user = ConnectionUtil.getUserList(connection, name, password);
+        return user;
+    }
+
+    public void initLoginScene(Stage primaryStage) {
+        StackPane pane = new StackPane();
+
+        Label IName = new Label("Username: "); // 아이디를 위한 레이블
+        Label IPassword = new Label("Password: "); // 비밀번호를 위한 레이블
+        Label lMessage = new Label(); // 로그인 시 메세지를 표시하기 위함
+
+        TextField tfName = new TextField(); // 유저가 입력한 값을 얻기 위함
+        PasswordField tfPassword = new PasswordField();
+        // 비밀번호의 특성을 표현하기 위함. ****로 표현
+
+        Button button = new Button("Login");   // Login 버튼을 만듬
+        button.prefHeightProperty().bind(tfName.heightProperty().add(tfPassword.heightProperty()));
+        // 버튼의 크기를 조절한다. ID,PASSWORD 칸과 같은 크기로 하고 싶기때문에 bind로 묶고, 속에 add로 이어준다.
+
+        button.setOnAction(e->{                     // 로그인 버튼을 눌렀을때 이벤트 발생
+            lMessage.setStyle("-fx-text-till: red;");   // 메세지 색깔을 red로 설정
+
+            String name = tfName.getText();            // 유저가 입력한 아이디
+            String password = tfPassword.getText();      // 유저가 입력한 패스워드
+
+            if (validate(name, password)) {
+
+                // DB connection
+                User user = signin(name, password);
+
+                if(user != null) {
+                    // 성공적으로 로그인이 되었다면
+                    initChatScene(primaryStage, user);
+                } else {
+                    // 아이디 혹은 비밀번호가 틀렸다면
+                    lMessage.setText("Wrong name or password. Please enter your name and password");
+                }
+            } else {
+                lMessage.setText("Invalid name or password. Please enter your name and password");
+            }
+        });
+
+        GridPane grid = new GridPane();
+        grid.addRow(0, IName, tfName); // 가장 첫번째 줄에는 아이디를 표현하기 위함
+        grid.addRow(1, IPassword, tfPassword); // 비밀번호를 표현하기 위함
+        grid.add(button,2,0,1,2);      // 버튼을 넣고, 세로길이 2, 가로길이 0, 여분은 1,2
+        grid.add(lMessage, 0, 2,3,1);
+        grid.setAlignment(Pos.CENTER); // 중앙에 위치
+
+        pane.getChildren().add(grid); // 앞서 정의한 pane에 gird를 넣어줌
+        Scene scene = new Scene(pane,800,400);
+
+        primaryStage.setTitle("[ 클라이언트 로그인 ]");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    public void initChatScene(Stage primaryStage, User user) {
         BorderPane root = new BorderPane();  // 기본적인 레이아웃
         root.setPadding((new Insets(5)));    // 디자인
 
@@ -100,7 +171,7 @@ public class ClientMain extends Application {
 
         TextField userName = new TextField();   // 이름이 들어갈 텍스트 공간 생성
         userName.setPrefWidth(150);            // 너비는 150
-        userName.setPromptText("닉네임을 입력하세요");
+        userName.setPromptText(user.getName() + "님, 닉네임을 입력하세요");
         HBox.setHgrow(userName, Priority.ALWAYS);
         // HBox 내부에서 해당 텍스트필드가 출력이 될 수 있도록
         TextField IPText = new TextField("127.0.01"); // 기본적인 자신의 컴퓨터 주소
@@ -168,15 +239,25 @@ public class ClientMain extends Application {
         pane.setRight(sendButton);         //오른쪽에는 보내기 버튼
 
         root.setBottom(pane);
-        Scene scene = new Scene(root, 400, 400);   // 해상도
-        primaryStage.setTitle("[ 채팅 클라이언트 ]");   // 정보
+        Scene scene = new Scene(root, 800, 400);   // 해상도
+
+        primaryStage.setTitle("[ 클라이언트 대기화면 ]");   // 정보
         primaryStage.setScene(scene);            // 등록
         primaryStage.setOnCloseRequest(event->stopClient());
-        // 사용자가 닫기 버튼을 누르면 stopClinet를 수행하고 종료가 이루어지도록
         primaryStage.show();
 
-        connectionButton.requestFocus();
         //기본적으로 프로그램이 시작되면 접속하기 버튼이 포커싱 되게 설정
+        connectionButton.requestFocus();
+    }
+
+    //실제로 프로그램을 동작시키는 메소드
+    @Override
+    public void start(Stage primaryStage) {
+        try {
+            initLoginScene(primaryStage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     // 프로그램 진입점

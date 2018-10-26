@@ -51,6 +51,10 @@ public class Server extends Application {
                         System.out.println("[클라이언트 접속]"
                                 + socket.getRemoteSocketAddress()
                                 + ": " + Thread.currentThread().getName());
+
+                        //TODO
+
+
                     } catch(Exception e) {
                         if(!serverSocket.isClosed()) // 서버소켓에 문제가 발생했다면
                             stopServer();            // 서버 작동 중단
@@ -86,6 +90,7 @@ public class Server extends Application {
     }
 
     //UI를 생성하고, 실질적으로 프로그램을 동작시키는 메소드
+    @Override
     public void start(Stage primaryStage) {
         BorderPane root = new BorderPane();         // 전체 디자인 틀을 담는 레이아웃
         root.setPadding(new Insets(5));            // 내부에 5만큼 패딩을 줌
